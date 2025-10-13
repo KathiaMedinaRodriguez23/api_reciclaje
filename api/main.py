@@ -1,10 +1,13 @@
 import io, uuid
-from .firebase_io import init_firebase, upload_image_and_get_url, save_prediction_doc, now_iso_utc
+from .firebase_io import list_predictions, init_firebase, upload_image_and_get_url, save_prediction_doc, now_iso_utc
 from .inference import map_category
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from PIL import Image
+
+from typing import List, Optional
 
 from .settings import (
     PORT, API_KEY, ALLOWED_ORIGINS,
@@ -23,6 +26,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+class PredictionOut(BaseModel):
+    id: str
+    label: str
+    category: str
+    dateIso: str
+    thumbnail: str
 
 def require_api_key(x_api_key: str | None = Header(default=None)):
     if API_KEY and x_api_key != API_KEY:
@@ -86,4 +96,15 @@ async def predict(
         "probs": probs_dict
     }
 
-
+@app.get("/predictions", response_model=List[PredictionOut])
+def get_predictions(
+    limit: int = Query(20, ge=1, le=100, description="Máx. 100"),
+    start_after_iso: Optional[str] = Query(None, description="ISO-8601 para paginar (dateIso de la última fila previa)")
+):
+    """
+    Lista documentos de Firestore ordenados por dateIso DESC.
+    - limit: cantidad a retornar (1..100)
+    - start_after_iso: dateIso (string ISO8601) para paginación
+    """
+    items = list_predictions(limit=limit, start_after_iso=start_after_iso)
+    return items
