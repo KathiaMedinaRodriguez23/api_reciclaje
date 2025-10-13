@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: recycling-inference:latest
+    container_name: recycling-inference
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /var/cache/models:/var/cache/models
+      - /opt/recycling-inference/secrets/firebase-sa.json:/secrets/firebase-sa.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/healthz').read())"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
