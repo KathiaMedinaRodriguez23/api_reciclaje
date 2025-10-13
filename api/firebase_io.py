@@ -8,7 +8,7 @@ from firebase_admin import credentials, storage, firestore
 
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
 FIREBASE_BUCKET = os.getenv("FIREBASE_BUCKET")
-GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/run/secrets/firebase_sa.js")
 FIREBASE_COLLECTION = os.getenv("FIREBASE_COLLECTION", "predictions")
 
 _app_inited = False

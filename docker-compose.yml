@@ -1,3 +1,4 @@
+name: "taller_backend"
 services:
   api:
     build:
@@ -6,15 +7,30 @@ services:
     image: recycling-inference:latest
     container_name: recycling-inference
     restart: unless-stopped
-    env_file: .env
+    environment:
+      MODEL_URI: "https://firebasestorage.googleapis.com/v0/b/cip-platform-574db.appspot.com/o/files_reciclaje%2Fmodelos%2Fmultilabel_best_phase2.h5?alt=media&token=4a33e138-cf52-49ce-83b9-38fe79761cd8"
+      MODEL_CACHE_DIR: "/var/cache/models"
+      ALLOWED_ORIGINS: "*"
+      PORT: "8000"
+      FIREBASE_PROJECT_ID: "cip-platform-574db"
+      FIREBASE_BUCKET: "cip-platform-574db.appspot.com"
+      GOOGLE_APPLICATION_CREDENTIALS: "/run/secrets/firebase_sa.json"
+      FIREBASE_COLLECTION: "predictions"
+    secrets:
+      - source: firebase_sa
+        target: firebase_sa.json
+        mode: 0444
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - /var/cache/models:/var/cache/models
-      - /opt/recycling-inference/secrets/firebase-sa.json:/secrets/firebase-sa.json:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/healthz').read())"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
+
+secrets:
+  firebase_sa:
+    file: ./secrets/firebase_sa.json
