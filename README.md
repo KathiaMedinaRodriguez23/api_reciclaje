@@ -14,7 +14,9 @@ uvicorn api.main:app --reload
 
 Para ejecutar el proyecto en Windows, utiliza el siguiente comando en PowerShell:
 
-```powershell
+### powershell
+
+```bash
 docker compose up --build -d ; if($?) {docker system prune -a -f --volumes}
 ```
 
