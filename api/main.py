@@ -74,7 +74,14 @@ async def predict(
     # 1) Inferencia
     preds = predict_pil_image(img)
     probs_dict = {cls: float(preds[i]) for i, cls in enumerate(CLASS_NAMES)}
+
+    # 🔥 top-1 global (tu label principal)
     top_label = max(probs_dict, key=probs_dict.get)
+
+    # 🔥 obtener top-2
+    sorted_probs = sorted(probs_dict.items(), key=lambda x: x[1], reverse=True)
+    top2 = sorted_probs[:2]
+    top2_dict = {cls: float(prob) for cls, prob in top2}
 
     # 2) Subir imagen al Storage
     uid = str(uuid.uuid4())
@@ -86,17 +93,18 @@ async def predict(
     category = map_category(top_label)
     doc = save_prediction_doc(
         doc_id=uid,
-        label=top_label.capitalize(),     # "Plastico"
-        category=category,                # "Residuo Inorgánico"
-        date_iso=date_iso,                # "2025-12-23T14:05:00Z"
+        label=top_label.capitalize(),
+        category=category,
+        date_iso=date_iso,
         thumbnail_url=thumb_url
     )
 
-    # 4) Respuesta (como pediste)
+    # 4) Respuesta final
     return {
-        "label": doc["label"],
-        "probs": probs_dict
+        "label": top_label,
+        "probs": top2_dict
     }
+
 
 @app.get("/predictions", response_model=List[PredictionOut])
 def get_predictions(
