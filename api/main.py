@@ -1,5 +1,5 @@
 import io, uuid
-from .firebase_io import list_predictions, init_firebase, upload_image_and_get_url, save_prediction_doc, now_iso_utc
+from .firebase_io import list_predictions, init_firebase, upload_image_and_get_url, save_prediction_doc, now_iso_utc, get_label_totals
 from .inference import map_category
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends, Query
@@ -11,6 +11,7 @@ import time
 
 from typing import List, Optional
 
+from .schemas import PredictionsResponse
 from .settings import (
     PORT, API_KEY, ALLOWED_ORIGINS,
     DEFAULT_THRESHOLD, DEFAULT_TOP_K, CLASS_NAMES
@@ -29,12 +30,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class PredictionOut(BaseModel):
-    id: str
-    label: str
-    category: str
-    dateIso: str
-    thumbnail: str
 
 def require_api_key(x_api_key: str | None = Header(default=None)):
     if API_KEY and x_api_key != API_KEY:
@@ -106,18 +101,28 @@ async def predict(
     }
 
 
-@app.get("/predictions", response_model=List[PredictionOut])
+@app.get("/predictions", response_model=PredictionsResponse)
 def get_predictions(
     limit: int = Query(20, ge=1, le=100, description="Máx. 100"),
     start_after_iso: Optional[str] = Query(None, description="ISO-8601 para paginar (dateIso de la última fila previa)")
 ):
     """
-    Lista documentos de Firestore ordenados por dateIso DESC.
-    - limit: cantidad a retornar (1..100)
-    - start_after_iso: dateIso (string ISO8601) para paginación
+    Lista documentos de Firestore ordenados por dateIso DESC + devuelve totales por label.
     """
     items = list_predictions(limit=limit, start_after_iso=start_after_iso)
-    return items
+
+    # Totales globales por clase (toda la colección)
+    totals = get_label_totals(CLASS_NAMES)
+
+    # Para paginación simple en cliente:
+    next_cursor = items[-1]["dateIso"] if items else None
+
+    return {
+        "items": items,
+        "totalsByLabel": totals,
+        "totalItemsInPage": len(items),
+        "nextStartAfterIso": next_cursor
+    }
 
 @app.get("/captura")
 def captura():
