@@ -1,6 +1,7 @@
 import importlib
 from fastapi.testclient import TestClient
 from io import BytesIO
+from PIL import Image
 from unittest.mock import MagicMock
 import numpy as np
 
@@ -31,6 +32,13 @@ def _reload_main(monkeypatch, api_key=None):
     importlib.reload(api.settings)
     importlib.reload(api.main)
     return api.main
+
+
+def _jpeg_1x1_bytesio():
+    buf = BytesIO()
+    Image.new("RGB", (1, 1), (255, 255, 255)).save(buf, format="JPEG")
+    buf.seek(0)
+    return buf
 
 
 def _client_with_api_key(monkeypatch, key="test-key"):
@@ -185,15 +193,11 @@ def test_predict_success_returns_label_and_probs_and_saves_doc(monkeypatch):
 
     client = TestClient(main.app)
     # PNG válido 1x1 (para pasar la validación real de PIL)
-    png_1x1 = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc`\x00\x00"
-        b"\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    img = _jpeg_1x1_bytesio()
 
     res = client.post(
         "/predict",
-        files={"file": ("img.png", BytesIO(png_1x1), "image/png")}
+        files={"file": ("img.jpg", img, "image/jpeg")},
     )
 
     assert res.status_code == 200, res.json()
@@ -258,15 +262,11 @@ def test_predict_probs_are_numeric_in_range_and_top2(monkeypatch):
 
     client = TestClient(main.app)
 
-    png_1x1 = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc`\x00\x00"
-        b"\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    img = _jpeg_1x1_bytesio()
 
     res = client.post(
         "/predict",
-        files={"file": ("img.png", BytesIO(png_1x1), "image/png")},
+        files={"file": ("img.jpg", img, "image/jpeg")},
     )
 
     assert res.status_code == 200, res.json()
@@ -323,15 +323,11 @@ def test_predict_uploads_image_with_expected_dest_path(monkeypatch):
     client = TestClient(main.app)
 
     # PNG válido 1x1
-    png_1x1 = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc`\x00\x00"
-        b"\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    img = _jpeg_1x1_bytesio()
 
     res = client.post(
         "/predict",
-        files={"file": ("img.png", BytesIO(png_1x1), "image/png")},
+        files={"file": ("img.jpg", img, "image/jpeg")},
     )
 
     assert res.status_code == 200, res.json()
@@ -388,16 +384,11 @@ def test_predict_saves_required_fields(monkeypatch):
     client = TestClient(main.app)
 
     # PNG válido 1x1
-    png_1x1 = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc`\x00\x00"
-        b"\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    img = _jpeg_1x1_bytesio()
 
     res = client.post(
         "/predict",
-        files={"file": ("img.png", BytesIO(png_1x1), "image/png")},
-        headers={"X-API-KEY": "tu_api_key_real"}
+        files={"file": ("img.jpg", img, "image/jpeg")},
     )
 
     assert res.status_code == 200, res.json()
