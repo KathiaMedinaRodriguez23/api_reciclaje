@@ -1,10 +1,12 @@
+import os
 import io, uuid
+from io import BytesIO
 from .firebase_io import list_predictions, init_firebase, upload_image_and_get_url, save_prediction_doc, now_iso_utc, get_label_totals
 from .inference import map_category
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+
 from PIL import Image
 import cv2
 import time
@@ -32,8 +34,11 @@ app.add_middleware(
 
 
 def require_api_key(x_api_key: str | None = Header(default=None)):
+    if os.getenv("SKIP_AUTH", "0") == "1":
+        return
     if API_KEY and x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API Key")
+
 
 @app.on_event("startup")
 def _startup():
@@ -62,7 +67,8 @@ async def predict(
         raise HTTPException(status_code=400, detail="Empty file")
 
     try:
-        img = Image.open(io.BytesIO(content)).convert("RGB")
+        Image.open(BytesIO(content)).verify()
+        img = Image.open(BytesIO(content)).convert("RGB")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image")
 
