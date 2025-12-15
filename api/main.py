@@ -1,6 +1,7 @@
 import os
 import io, uuid
 from io import BytesIO
+from contextlib import asynccontextmanager
 from .firebase_io import list_predictions, init_firebase, upload_image_and_get_url, save_prediction_doc, now_iso_utc, get_label_totals
 from .inference import map_category
 
@@ -22,7 +23,23 @@ from .inference import (
     load_or_build_model, predict_pil_image, postprocess
 )
 
-app = FastAPI(title="Recycling Inference API")
+
+def require_api_key(x_api_key: str | None = Header(default=None)):
+    if os.getenv("SKIP_AUTH", "0") == "1":
+        return
+    if API_KEY and x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- startup ---
+    load_or_build_model()
+    init_firebase()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,25 +50,11 @@ app.add_middleware(
 )
 
 
-def require_api_key(x_api_key: str | None = Header(default=None)):
-    if os.getenv("SKIP_AUTH", "0") == "1":
-        return
-    if API_KEY and x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
-
-
-@app.on_event("startup")
-def _startup():
-    # Construye/carga el modelo
-    load_or_build_model()
-    # Inicializa Firebase (Storage + Firestore)
-    init_firebase()
-
-
 @app.get("/healthz")
 def healthz():
     # Si load_or_build_model falla, FastAPI ya no arranca; acá devolvemos ok
     return {"status": "ok", "model_loaded": True}
+
 
 @app.post("/predict", dependencies=[Depends(require_api_key)] if API_KEY else [])
 async def predict(
